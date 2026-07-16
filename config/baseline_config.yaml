@@ -1,0 +1,89 @@
+# =============================================================================
+# baseline_config.yaml
+# Central configuration for the Industrial Defect Detection Benchmark Suite.
+# =============================================================================
+
+experiment:
+  name: "industrial_defect_bench_v1"
+  seed: 42
+  output_dir: "./runs"
+  device: "auto"          # auto | cuda | cpu | mps
+  precision: "fp32"       # fp32 | fp16 | bf16
+
+data:
+  dataset_name: "mvtec-ad"
+  root_dir: "./data/mvtec-ad"          # if missing -> SyntheticIndustrialDataset kicks in
+  category: "grid"                      # default MVTec-style category
+  image_size: 224
+  synthetic:
+    enabled_fallback: true
+    num_train_normal: 200
+    num_test_normal: 60
+    num_test_anomalous: 60
+    texture_types: ["grid_lines", "brushed_metal", "carpet_weave"]
+    anomaly_types: ["scratch", "cut", "dent_blob"]
+  num_workers: 4
+  pin_memory: true
+
+models:
+  resnet50:
+    type: "cnn"
+    source: "torchvision"
+    weights: "IMAGENET1K_V2"
+    feature_dim: 2048
+    embedding_layer: "layer4"
+
+  vit_b_16:
+    type: "transformer"
+    source: "torchvision"
+    weights: "IMAGENET1K_SWAG_E2E_V1"
+    feature_dim: 768
+    patch_size: 16
+    num_layers: 12
+    num_heads: 12
+
+  dinov2_vits14:
+    type: "transformer"
+    source: "torch_hub"
+    hub_repo: "facebookresearch/dinov2"
+    hub_entry: "dinov2_vits14"
+    feature_dim: 384
+    patch_size: 14
+    num_layers: 12
+    num_heads: 6
+
+adaptation:
+  method: "lora"
+  lora_rank: 8
+  lora_alpha: 16
+  lora_dropout: 0.05
+  target_modules: ["query", "value"]
+  freeze_backbone: true
+
+training:
+  optimizer: "adamw"
+  learning_rate: 1.0e-3
+  backbone_learning_rate: 1.0e-4
+  weight_decay: 1.0e-4
+  epochs: 30
+  linear_probe_epochs: 50
+  early_stopping_patience: 5
+  few_shot_shots: [5, 20]
+  layer_selection_modes: ["cls_token_final", "concat_last_two_layers"]
+
+profiling:
+  batch_sizes: [1, 16]
+  warmup_iters: 10
+  measured_iters: 50
+  track_vram: true
+
+evaluation:
+  metrics: ["accuracy", "f1_micro", "f1_macro", "auroc"]
+  visualize:
+    heatmap: true
+    embedding_projection: "pca"   # pca | tsne
+
+logging:
+  level: "INFO"
+  log_file: "benchmark.log"
+  console: true
